@@ -4,8 +4,8 @@
 
 options(stringsAsFactors = FALSE)
 
-wkdir="/path/to/my/directory"
-setwd(paste(wkdir,"Broad-transcriptomic-dysregulation-across-the-cerebral-cortex-in-ASD/",sep=""))
+wkdir="/disk3/takata"
+setwd(paste(wkdir,"Broad-transcriptomic-dysregulation-across-the-cerebral-cortex-in-ASD",sep="/"))
 
 library(limma); library(statmod); library(WGCNA)
 
@@ -43,8 +43,8 @@ this_contrast_dup15q = makeContrasts(contrast=(DxRegDup15q_BA17 + DxRegDup15q_BA
                                                  DxRegCTL_BA39_40 - DxRegCTL_BA4_6 - DxRegCTL_BA41_42_22 - DxRegCTL_BA44_45 -      
                                                  DxRegCTL_BA7 - DxRegCTL_BA9)/11, levels=design)
 
-this_contrast_asd <- data.frame(this_contrast_asd[match(colnames(fit$coefficients),rownames(this_contrast_asd)),])
-this_contrast_dup15q <- data.frame(this_contrast_dup15q[match(colnames(fit$coefficients),rownames(this_contrast_dup15q)),])
+# this_contrast_asd <- data.frame(this_contrast_asd[match(colnames(fit$coefficients),rownames(this_contrast_asd)),])
+# this_contrast_dup15q <- data.frame(this_contrast_dup15q[match(colnames(fit$coefficients),rownames(this_contrast_dup15q)),])
 
 ### Get the whole cortex and region-specific contrasts
 
@@ -61,7 +61,7 @@ for(j in c(1:ncol(assoc_table_p))){
   print(j)
   if(length(grep("Diagnosis",colnames(assoc_table_p)[j])) > 0){
     if(j==4){
-      fit_asd = contrasts.fit(fit, this_contrast_asd)
+      fit_asd = contrasts.fit(fit, contrasts=this_contrast_asd)
       fit2_asd= eBayes(fit_asd,trend = T, robust = T)
       tt_ASD_Region= topTable(fit2_asd, coef=1, number=Inf, sort.by = 'none')
       write.csv(tt_ASD_Region,file="data_user/02_DEGenesIsoforms/02_01_A_01_ttable_ASD_WholeCortex.csv")
@@ -112,7 +112,13 @@ for(j in c(1:ncol(assoc_table_p))){
   reg = colnames(assoc_table_p)[j]
   form = paste("DxRegASD_",reg," - DxRegCTL_",reg,sep="")
   this_contrast = makeContrasts(contrast=form,levels=design)
-  this_contrast <- data.frame(this_contrast[match(colnames(fit$coefficients),rownames(this_contrast)),])
+  # this_contrast <- data.frame(this_contrast[match(colnames(fit$coefficients),rownames(this_contrast)),])
+  ## this_contrast should be a matrix, not a data frame. Filter out invalid indices.
+  valid_indices <- match(colnames(fit$coefficients), rownames(this_contrast)) # get valid indices
+  valid_indices <- valid_indices[!is.na(valid_indices)]                       # remove NAs
+  this_contrast_filtered <- this_contrast[valid_indices, ]                    # filter out invalid indices that having NAs
+  this_contrast <- as.matrix(this_contrast_filtered)                          # convert to matrix
+
   fit_reg = contrasts.fit(fit, this_contrast)
   fit2= eBayes(fit_reg,trend = T, robust = T)
   tt_tmp= topTable(fit2, coef=1, number=Inf, sort.by = 'none')
@@ -148,7 +154,12 @@ for(j in c(1:ncol(assoc_table_p))){
   reg = colnames(assoc_table_p)[j]
   form = paste("DxRegDup15q_",reg," - DxRegCTL_",reg,sep="")
   this_contrast = makeContrasts(contrast=form,levels=design)
-  this_contrast <- data.frame(this_contrast[match(colnames(fit$coefficients),rownames(this_contrast)),])
+  # this_contrast <- data.frame(this_contrast[match(colnames(fit$coefficients),rownames(this_contrast)),])
+  valid_indices <- match(colnames(fit$coefficients), rownames(this_contrast))
+  valid_indices <- valid_indices[!is.na(valid_indices)]
+  this_contrast_filtered <- this_contrast[valid_indices, ]
+  this_contrast <- as.matrix(this_contrast_filtered)
+
   fit_reg = contrasts.fit(fit, this_contrast)
   fit2= eBayes(fit_reg,trend = T, robust = T)
   tt_tmp= topTable(fit2, coef=1, number=Inf, sort.by = 'none')
@@ -250,6 +261,6 @@ for(j in c(1:ncol(assoc_table_p))){
 
 ### Save the ASD region-specific p-values, betas/effects, and standard errors for all MEs.
 
-save(assoc_table_p,assoc_table_beta,assoc_table_me,
+save(assoc_table_p,assoc_table_beta,assoc_table_se,
      file="data_user/02_DEGenesIsoforms/02_01_A_02_VoineaguParikshak_RegionSpecificASD.RData")
 
